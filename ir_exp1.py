@@ -81,10 +81,3 @@ p_gaussian.save(f"boy_noisy_smoothed_gaussian-7")
 
 p_gaussian = spatially_filtered("boy_noisy.pgm", gaussian_matrix_15, normalize=True, truncate=False)
 p_gaussian.save(f"boy_noisy_smoothed_gaussian-15")
-
-
-# Experiment 2 (Convolution in Frequency Domain)
-
-# Experiment 3 (Image Restoration - motion blur)
-
-# Experiment 4 (Homomorphic filtering)
