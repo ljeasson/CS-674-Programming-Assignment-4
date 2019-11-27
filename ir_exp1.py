@@ -1,54 +1,50 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from scipy import fftpack
+import cv2
 
 from Lib import spatially_filtered, Kernel
 from PGM import PGMImage
 
 # Experiment 1 (Noise Removal)
+img = cv2.imread("images/boy_noisy.png",0)
 
-# Load boy_noisy image
-im = plt.imread("images/boy_noisy.png").astype(float)
+dft = cv2.dft(np.float32(img),flags = cv2.DFT_COMPLEX_OUTPUT)
+dft_shift = np.fft.fftshift(dft)
+
+magnitude_spectrum = 20*np.log(cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1]))
+
+# Get number of rows and columns,
+# and center
+rows, cols = img.shape
+crow,ccol = rows/2 , cols/2
+
+# Create mask
+# Center square is 1, remaining all zeros
+mask = np.zeros((rows,cols,2),np.uint8)
+mask[int(crow-30):int(crow+30), int(ccol-30):int(ccol+30)] = 1
+
+# Apply mask
+fshift = dft_shift*mask
+
+# Apply inverse DFT
+f_ishift = np.fft.ifftshift(fshift)
+img_back = cv2.idft(f_ishift)
+img_back = cv2.magnitude(img_back[:,:,0],img_back[:,:,1])
+
 plt.figure()
-plt.imshow(im, plt.cm.gray)
+plt.imshow(img, plt.cm.gray)
 plt.title('Original image')
 
-# Apply FFT to boy_noisy
-im_fft = fftpack.fft2(im)
-def plot_spectrum(im_fft):
-    # Logarithmic colormap
-    plt.imshow(np.abs(im_fft), norm=LogNorm(vmin=5))
-    plt.colorbar()
 plt.figure()
-plot_spectrum(im_fft)
-plt.title('Fourier transform')
-
-# Define the fraction of coefficients (in each direction) we keep
-keep_fraction = 1.0
-# Copy fft and Set r and c to be the number of rows and columns of the array.
-im_fft2 = im_fft.copy()
-r, c = im_fft2.shape[0], im_fft2.shape[1] 
-# Set to zero all rows and columns with indices between 
-# r*keep_fraction and r*(1-keep_fraction):
-im_fft2[int(r*keep_fraction):int(r*(1-keep_fraction))] = 0
-im_fft2[:, int(c*keep_fraction):int(c*(1-keep_fraction))] = 0
-plt.figure()
-plot_spectrum(im_fft2)
-plt.title('Filtered Spectrum')
-
-# Apply inverse FFT
-im_new = fftpack.ifft2(im_fft2).real
-plt.figure()
-plt.imshow(im_new, plt.cm.gray)
-plt.title('Reconstructed Image')
+plt.imshow(img_back, plt.cm.gray)
+plt.title('Filtered image')
 
 plt.show()
 
 # TODO: Extract noise pattern
 
-
+'''
 # Apply Gaussian Smoothing (7x7) and (15x15)
 p = PGMImage("images/boy_noisy.pgm")
 gaussian_matrix_7 = Kernel(mask = [ [1,1,2,2,2,1,1], 
@@ -80,3 +76,4 @@ p_gaussian.save(f"smoothed-gaussian-7-{p.name}")
 
 p_gaussian = spatially_filtered(p, gaussian_matrix_15, normalize=True, truncate=False)
 p_gaussian.save(f"smoothed-gaussian-15-{p.name}")
+'''
