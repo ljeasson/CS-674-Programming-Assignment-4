@@ -3,26 +3,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
+from PIL import Image
 from Lib import spatially_filtered, Kernel
 from PGM import PGMImage
 
-# Experiment 1 (Noise Removal)
+# Experiment 1.a (Noise Removal)
 img = cv2.imread("images/boy_noisy.png",0)
 
+# Apply DFT and FFT shift
 dft = cv2.dft(np.float32(img),flags = cv2.DFT_COMPLEX_OUTPUT)
 dft_shift = np.fft.fftshift(dft)
 
 magnitude_spectrum = 20*np.log(cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1]))
 
 # Get number of rows and columns,
-# and center
+# and center image
 rows, cols = img.shape
-crow,ccol = rows/2 , cols/2
+center_row, center_col = rows/2 , cols/2
 
 # Create mask
 # Center square is 1, remaining all zeros
 mask = np.zeros((rows,cols,2),np.uint8)
-mask[int(crow-30):int(crow+30), int(ccol-30):int(ccol+30)] = 1
+mask[int(center_row-30):int(center_row+30), int(center_col-30):int(center_col+30)] = 1
 
 # Apply mask
 fshift = dft_shift*mask
@@ -32,9 +34,14 @@ f_ishift = np.fft.ifftshift(fshift)
 img_back = cv2.idft(f_ishift)
 img_back = cv2.magnitude(img_back[:,:,0],img_back[:,:,1])
 
+# Plot images
 plt.figure()
 plt.imshow(img, plt.cm.gray)
 plt.title('Original image')
+
+plt.figure()
+plt.imshow(magnitude_spectrum, plt.cm.gray)
+plt.title('Magnitude Spectrum')
 
 plt.figure()
 plt.imshow(img_back, plt.cm.gray)
@@ -42,7 +49,7 @@ plt.title('Filtered image')
 
 plt.show()
 
-# TODO: Extract noise pattern
+# TODO: Experiment 1.b (Extract noise pattern)
 
 '''
 # Apply Gaussian Smoothing (7x7) and (15x15)
