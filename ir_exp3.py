@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -30,79 +31,124 @@ def H(u,v,T,a,b):
 
 
 # Experiment 3 (Image Restoration - motion blur)
-F = PGMImage("images/lenna.pgm")
-F_pixels = []
-for row in F.pixels:
-    F_pixels.append([i for i in row])
 
+# Apply motion blur to lenna
+img = cv2.imread("images/lenna.png")
+cv2.imshow('Original', img)
+size = 30
 
-# TODO: Apply motion blur to lenna
-G = PGMImage("images/lenna.pgm")
-G_pixels = []
-for row in F.pixels:
-    G_pixels.append([i for i in row])
+# Generating motion blur kernel
+kernel_motion_blur = np.zeros((size, size))
+kernel_motion_blur[int((size-1)/2), :] = np.ones(size)
+kernel_motion_blur = kernel_motion_blur / size
 
-for row in range(len(G_pixels)):
-    for column in range(len(G_pixels[row])):
-        G_pixels[row][column] = F_pixels[row][column] * H(row, column, T=1, a=0.1, b=0.1)
+# Apply kernel to the input image
+output = cv2.filter2D(img, -1, kernel_motion_blur)
 
-G.pixels = G_pixels
-G.truncate_intensity_values()
-
-G.save(f"Motion-blur-{F.name}")
+# Save motion blurred image
+cv2.imwrite("images/motion_blur_lenna.png", output)
 
 
 # Apply Gaussian noise to motion-blurred lenna
-for i in (1, 10, 100):
-    G_noisy = PGMImage("Motion-blur-lenna.pgm")
+# with varying sigma values
+for stdev in (1, 10, 100):
+    img = cv2.imread("images/motion_blur_lenna.png")
+    row,col,chn = img.shape
+    mean = 0
+    gauss = np.random.normal(mean, stdev,(row,col,chn))
+    gauss = gauss.reshape(row,col,chn)
+    noisy = img + gauss
 
-    G_pixels_noisy = []
-    for row in G.pixels:
-        G_pixels_noisy.append([i for i in row])
-
-    for row in range(len(F_pixels)):
-        for column in range(len(F_pixels[row])):
-            G_pixels_noisy[row][column] = G_pixels_noisy[row][column] + box_muller(i,0)
-
-    G_noisy.pixels = G_pixels_noisy
-    G_noisy.truncate_intensity_values()
-
-    G_noisy.save(f"Motion-blurred-Gaussian-noise-stdev{i}-{F.name}")
-
+    cv2.imwrite("images/Gaussian_blur_stdev_"+str(stdev)+"_motion_blur_lenna.png", noisy)
+    
 
 # TODO: Apply Inverse Filtering to each degraded image
 def inverse_filtering(image, r):
-    inv_filtered = PGMImage(image)
-    inv_filtered_pixels = []
-    for row in inv_filtered.pixels:
-        inv_filtered_pixels.append([i for i in row])
+    img = cv2.imread(image)
+    restored_img = np.zeros(img.shape)
 
-    inv_filtered.pixels = inv_filtered_pixels
-    inv_filtered.truncate_intensity_values()
+    # TODO: Inverse filtering algorithm
+    # F_hat = G / H
+    for i in range(0,3):
+        # Compute 2D FFT
+        g = img[:,:,i]
+        G = np.fft.fft2(g)
 
-    inv_filtered.save(f"Inverse_filtered-{r}-{inv_filtered.name}")
+        # Pad kernel with zeros
+        h = np.zeros(g.shape)
+        h_padded = np.zeros(g.shape)
+        h_padded[:h.shape[0],:h.shape[1]] = np.copy(h)
+        H = (np.fft.fft2(h_padded))
 
-for img in ("Motion-blurred-Gaussian-noise-stdev1-lenna.pgm", 
-        "Motion-blurred-Gaussian-noise-stdev10-lenna.pgm",
-        "Motion-blurred-Gaussian-noise-stdev100-lenna.pgm"):
+        # Normalize
+        H_norm = H/abs(H.max())
+        G_norm = G/abs(G.max())
+        F_temp = G_norm/H_norm
+        F_norm = F_temp/abs(F_temp.max())
+
+        # Rescale
+        F_hat = F_norm*abs(G.max())
+
+        # Apply inverse fft
+        f_hat = np.fft.ifft2(F_hat)
+        restored_img[:,:,i] = abs(f_hat)
+
+    cv2.imwrite("images/Inverse_filtered_"+str(r)+".png", restored_img)
+
+''' 
+for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
+            "images/Gaussian_blur_stdev_10_motion_blur_lenna.png", 
+            "images/Gaussian_blur_stdev_100_motion_blur_lenna.png"):
     for r in (40, 70, 85):
         inverse_filtering(img, r)
+'''
+for r in (40, 70, 85):
+    inverse_filtering("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", r)
 
 
 # TODO: Apply Wiener Filtering to each degraded image
 def wiener_filtering(image, k):
-    wiener_filtered = PGMImage(image)
-    wiener_filtered_pixels = []
-    for row in wiener_filtered.pixels:
-        wiener_filtered_pixels.append([i for i in row])
+    img = cv2.imread(image)
+    restored_img = np.zeros(img.shape)
+    
+    # TODO: Wiener Filtering algorithm
+    for i in range(0,3):
+        # Compute 2D FFT
+        g = img[:,:,i]
+        G = np.fft.fft2(g)
 
-    wiener_filtered.pixels = wiener_filtered_pixels
-    wiener_filtered.truncate_intensity_values()
+        # Pad kernel with zeros
+        h = np.zeros(g.shape)
+        h_padded = np.zeros(g.shape)
+        h_padded[:h.shape[0],:h.shape[1]] = np.copy(h)
+        H = (np.fft.fft2(h_padded))
 
-    wiener_filtered.save(f"Wiener_filtered-{k}-{wiener_filtered.name}")
+        # Find the inverse filter term
+        weiner_term = (abs(H)**2 + k)/(abs(H)**2)
+        print("max value of abs(H)**2 is ",(abs(H)**2).max())
+        H_weiner = H*weiner_term
+        
+        # Normalize
+        H_norm = H_weiner/abs(H_weiner.max())
+        G_norm = G/abs(G.max())
+        F_temp = G_norm/H_norm
+        F_norm = F_temp/abs(F_temp.max())
 
-for img in ("Motion-blurred-Gaussian-noise-stdev1-lenna.pgm", 
-        "Motion-blurred-Gaussian-noise-stdev10-lenna.pgm",
-        "Motion-blurred-Gaussian-noise-stdev100-lenna.pgm"):
+        # Rescale
+        F_hat  = F_norm*abs(G.max())
+            
+        # Apply inverse FFT
+        f_hat = np.fft.ifft2(F_hat)
+        restored_img[:,:,i] = abs(f_hat)
+
+    cv2.imwrite("images/Wiener_filtered_"+str(k)+".png", restored_img)
+
+'''
+for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
+            "images/Gaussian_blur_stdev_10_motion_blur_lenna.png", 
+            "images/Gaussian_blur_stdev_100_motion_blur_lenna.png"):
     for k in (1, 10, 20, 50, 100):
         wiener_filtering(img, k)
+'''
+for k in (1, 10, 20, 50, 100):
+    wiener_filtering("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", k)
