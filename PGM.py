@@ -4,6 +4,7 @@ PGM parsing library for CS674 (Image Processing) at UNR.
 
 """
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List
 
@@ -35,7 +36,7 @@ class PGMImage:
 
             if self.signature != "P5":  # Other formats not used in CS674
                 raise InvalidPGMFormat(
-                    f"Format was {signature}, but only raw greyscale bytes"
+                    f"Format was {self.signature}, but only raw greyscale bytes"
                     " are acceptable."
                 )
 
@@ -69,8 +70,51 @@ class PGMImage:
                     f"Finished reading {pgm_filename} but content still left."
                 )
 
-    def save(self, pgm_filename):
-        """ Write this PGM image to a file. """
+    def normalize_intensity_values(self):
+        hi, lo = float("-inf"), 0
+        for i in range(self.rows):
+            for b in self.pixels[i]:
+                hi = max(b, hi)
+                lo = min(b, lo)
+
+        for i in range(self.rows):
+            self.pixels[i] = b"".join(
+                [
+                    bytes([int(((px - lo) / (hi - lo)) * self.quantization)])
+                    for px in self.pixels[i]
+                ]
+            )
+
+    def truncate_intensity_values(self):
+        def truncate(_px):
+            _px = int(_px)
+            _px = min(self.quantization, _px)
+            _px = max(0, _px)
+            return _px
+
+        for i in range(self.rows):
+            self.pixels[i] = b"".join([bytes([truncate(px)]) for px in self.pixels[i]])
+
+    def save(self, pgm_filename, normalize=False):
+        """ Write this PGM image to a file. 
+
+        :param pgm_filename Filename to save image to
+        :param normalize Whether to scale all pixel values to highest pixel value
+        """
+        if True:
+            print(f"Saving {self.name} to {pgm_filename}.")
+
+        if not normalize:
+            # Warn user if they're about to save with out-of-bounds pixel values
+            if any(
+                any(pxl > self.quantization or pxl < 0 for pxl in row)
+                for row in self.pixels
+            ):
+                raise InvalidPGMFormat(
+                    f"Image pixel values > {self.quantization}. Normalize or truncate first."
+                )
+        else:
+            self.normalize_intensity_values()
 
         def itobs(i: int) -> bytes:
             """ Convert integer to byte string. """
@@ -111,6 +155,51 @@ class PGMImage:
                 histogram[i] /= self.n_pixels
 
         return histogram
+
+    def __add__(self, other):
+        """ Sum pixel values in one image with those in another image. """
+        if isinstance(other, PGMImage):
+            assert (self.rows, self.cols) == (
+                other.rows,
+                other.cols,
+            ), "Images must be of the same sizes to be subtracted."
+
+            res = deepcopy(self)
+
+            for i in range(self.rows):
+                my_row = [b for b in self.pixels[i]]
+                their_row = [b for b in other.pixels[i]]
+                res.pixels[i] = b"".join(
+                    [
+                        bytes([min(x + y, self.quantization)])
+                        for x, y in zip(my_row, their_row)
+                    ]
+                )
+
+            return res
+
+        super().__add__(other)
+
+    def __sub__(self, other):
+        """ Difference of pixel values in one image with those in another image. """
+        if isinstance(other, PGMImage):
+            assert (self.rows, self.cols) == (
+                other.rows,
+                other.cols,
+            ), "Images must be of the same sizes to be added."
+
+            res = deepcopy(self)
+
+            for i in range(self.rows):
+                my_row = [b for b in self.pixels[i]]
+                their_row = [b for b in other.pixels[i]]
+                res.pixels[i] = b"".join(
+                    [bytes([max(x - y, 0)]) for x, y in zip(my_row, their_row)]
+                )
+
+            return res
+
+        super().__sub__(other)
 
     def show_histogram(self, normed: bool = False, title=None):
         """ Display a histogram of the image.
