@@ -62,11 +62,22 @@ for stdev in (1, 10, 100):
     cv2.imwrite("images/Gaussian_blur_stdev_"+str(stdev)+"_motion_blur_lenna.png", noisy)
     
 
+class MyImage:
+    img = None
+    name = ''
+
+    def __init__(self,name):
+        self.name = name
+        self.img = cv2.imread(name)
+
 # TODO: Apply Inverse Filtering to each degraded image
 def inverse_filtering(image, r):
     img = cv2.imread(image)
+    image_name = MyImage(image)
+    fileName = image_name.name[image_name.name.find('/')+1:image_name.name.find('.')]
     restored_img = np.zeros(img.shape)
 
+    '''
     # TODO: Inverse filtering algorithm
     # F_hat = G / H
     for i in range(0,3):
@@ -92,25 +103,25 @@ def inverse_filtering(image, r):
         # Apply inverse fft
         f_hat = np.fft.ifft2(F_hat)
         restored_img[:,:,i] = abs(f_hat)
+    '''
 
-    cv2.imwrite("images/Inverse_filtered_"+str(r)+".png", restored_img)
+    cv2.imwrite("images/Inverse_filtered_"+str(r)+"_"+str(fileName)+".png", restored_img)
 
-''' 
 for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_10_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_100_motion_blur_lenna.png"):
     for r in (40, 70, 85):
         inverse_filtering(img, r)
-'''
-for r in (40, 70, 85):
-    inverse_filtering("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", r)
 
 
 # TODO: Apply Wiener Filtering to each degraded image
 def wiener_filtering(image, k):
     img = cv2.imread(image)
+    image_name = MyImage(image)
+    fileName = image_name.name[image_name.name.find('/')+1:image_name.name.find('.')]
     restored_img = np.zeros(img.shape)
     
+    '''
     # TODO: Wiener Filtering algorithm
     for i in range(0,3):
         # Compute 2D FFT
@@ -140,15 +151,12 @@ def wiener_filtering(image, k):
         # Apply inverse FFT
         f_hat = np.fft.ifft2(F_hat)
         restored_img[:,:,i] = abs(f_hat)
+    '''
 
-    cv2.imwrite("images/Wiener_filtered_"+str(k)+".png", restored_img)
+    cv2.imwrite("images/Wiener_filtered_"+str(k)+"_"+str(fileName)+".png", restored_img)
 
-'''
 for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_10_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_100_motion_blur_lenna.png"):
     for k in (1, 10, 20, 50, 100):
         wiener_filtering(img, k)
-'''
-for k in (1, 10, 20, 50, 100):
-    wiener_filtering("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", k)
