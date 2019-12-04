@@ -41,8 +41,7 @@ mask_inv[int(center_row-30):int(center_row+30), int(center_col-30):int(center_co
 # Extract noise pattern
 noise_pattern = magnitude_spectrum*mask_inv
 ifft_noise_pattern = np.fft.ifft2(noise_pattern)
-ifft_shift_noise_pattern = np.fft.fftshift(ifft_noise_pattern)
-
+ifft_shift_noise_pattern = np.fft.fftshift(np.log(ifft_noise_pattern))
 
 # Plot images
 plt.figure()

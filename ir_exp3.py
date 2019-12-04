@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import random
 
 from math import pi, sin, cos, exp, sqrt, log
-from PGM import PGMImage
 
 def box_muller(stdev, mean):
     """ Retrieve a normally distributed value by sampling the Box-Muller transform. """
@@ -21,14 +20,6 @@ def box_muller(stdev, mean):
     box_muller.Z1 = sqrt( -2 * log(U1) ) * sin(2 * pi * U2)
    
     return Z0 * stdev + mean
-
-def H(u,v,T,a,b):
-    H = 1
-    muf = pi * (u*a + v*b)
-    if muf != 0.0: 
-        H = (T / muf) * sin(muf) * (cos(muf) - sin(muf))
-    return H
-
 
 # Experiment 3 (Image Restoration - motion blur)
 
@@ -61,7 +52,7 @@ for stdev in (1, 10, 100):
 
     cv2.imwrite("images/Gaussian_blur_stdev_"+str(stdev)+"_motion_blur_lenna.png", noisy)
     
-
+##############################################################################################
 class MyImage:
     img = None
     name = ''
@@ -70,41 +61,46 @@ class MyImage:
         self.name = name
         self.img = cv2.imread(name)
 
-# TODO: Apply Inverse Filtering to each degraded image
+def getH(u,v):
+    a=b= 0.1
+    T = 1
+    H = 1
+    muf = pi * ( (u*a) + (v*b) )
+    if muf != 0.0:
+        H = (T / muf) * sin(muf) * (cos(muf) + complex('j') * sin(muf))
+    return H
+
+# Apply Inverse Filtering to each degraded image
 def inverse_filtering(image, r):
+    # Open image and get file name
     img = cv2.imread(image)
     image_name = MyImage(image)
     fileName = image_name.name[image_name.name.find('/')+1:image_name.name.find('.')]
+    
+    # Create restored image
     restored_img = np.zeros(img.shape)
 
-    '''
-    # TODO: Inverse filtering algorithm
+    # Inverse filtering algorithm
     # F_hat = G / H
-    for i in range(0,3):
-        # Compute 2D FFT
-        g = img[:,:,i]
-        G = np.fft.fft2(g)
+    
+    # Compute 2D FFT of F and G
+    g = img[:,:]
+    G = np.fft.fft2(g)
+    F = np.fft.fft2(img)
 
-        # Pad kernel with zeros
-        h = np.zeros(g.shape)
-        h_padded = np.zeros(g.shape)
-        h_padded[:h.shape[0],:h.shape[1]] = np.copy(h)
-        H = (np.fft.fft2(h_padded))
-
-        # Normalize
-        H_norm = H/abs(H.max())
-        G_norm = G/abs(G.max())
-        F_temp = G_norm/H_norm
-        F_norm = F_temp/abs(F_temp.max())
-
-        # Rescale
-        F_hat = F_norm*abs(G.max())
-
-        # Apply inverse fft
-        f_hat = np.fft.ifft2(F_hat)
-        restored_img[:,:,i] = abs(f_hat)
-    '''
-
+    # Get H
+    H = G / F
+        
+    # Inverse Filter
+    F_hat = G / H
+    
+    # Rescale
+    F_hat = F_hat*abs(G.max())
+    
+    # Apply inverse fft
+    f_hat = np.fft.ifft2(F_hat)
+    restored_img[:,:] = abs(f_hat)
+    
     cv2.imwrite("images/Inverse_filtered_"+str(r)+"_"+str(fileName)+".png", restored_img)
 
 for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
@@ -114,49 +110,35 @@ for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png",
         inverse_filtering(img, r)
 
 
-# TODO: Apply Wiener Filtering to each degraded image
+# Apply Wiener Filtering to each degraded image
 def wiener_filtering(image, k):
     img = cv2.imread(image)
     image_name = MyImage(image)
     fileName = image_name.name[image_name.name.find('/')+1:image_name.name.find('.')]
     restored_img = np.zeros(img.shape)
     
-    '''
-    # TODO: Wiener Filtering algorithm
-    for i in range(0,3):
-        # Compute 2D FFT
-        g = img[:,:,i]
-        G = np.fft.fft2(g)
+    # Wiener Filtering algorithm
+    
+    # Compute 2D FFT
+    g = img[:,:]
+    G = np.fft.fft2(g)
+    F = np.fft.fft2(img)
 
-        # Pad kernel with zeros
-        h = np.zeros(g.shape)
-        h_padded = np.zeros(g.shape)
-        h_padded[:h.shape[0],:h.shape[1]] = np.copy(h)
-        H = (np.fft.fft2(h_padded))
+    # Get H
+    H = G / F
 
-        # Find the inverse filter term
-        weiner_term = (abs(H)**2 + k)/(abs(H)**2)
-        print("max value of abs(H)**2 is ",(abs(H)**2).max())
-        H_weiner = H*weiner_term
-        
-        # Normalize
-        H_norm = H_weiner/abs(H_weiner.max())
-        G_norm = G/abs(G.max())
-        F_temp = G_norm/H_norm
-        F_norm = F_temp/abs(F_temp.max())
-
-        # Rescale
-        F_hat  = F_norm*abs(G.max())
-            
-        # Apply inverse FFT
-        f_hat = np.fft.ifft2(F_hat)
-        restored_img[:,:,i] = abs(f_hat)
-    '''
+    # Find the wiener filter term
+    weiner_term = (abs(H)**2)/(abs(H)**2 + k)
+    H_weiner = (G/H)*weiner_term
+                
+    # Apply inverse FFT
+    f_hat = np.fft.ifft2(H_weiner)
+    restored_img[:,:] = abs(f_hat)
 
     cv2.imwrite("images/Wiener_filtered_"+str(k)+"_"+str(fileName)+".png", restored_img)
 
 for img in ("images/Gaussian_blur_stdev_1_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_10_motion_blur_lenna.png", 
             "images/Gaussian_blur_stdev_100_motion_blur_lenna.png"):
-    for k in (1, 10, 20, 50, 100):
+    for k in (1, 5, 8, 10, 20, 50, 100):
         wiener_filtering(img, k)
